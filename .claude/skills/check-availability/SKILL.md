@@ -18,8 +18,16 @@ description: ビジネスホテルしらさぎ（鹿児島県鹿屋市）の公�
 ## 手順
 
 1. **対象期間を決める**: 実行日（日本時間）から、3ヶ月後の月の末日まで。
-2. **各サイトを順に確認する**（Playwright + 事前インストール済みの Chromium を使う。
-   `executablePath: '/opt/pw-browsers/chromium'`。`playwright install` は実行しない）。
+2. **各サイトを順に確認する**。使うブラウザは次の優先順:
+   1. **Claude in Chrome**（`mcp__claude-in-chrome__*` ツール。無ければ ToolSearch で `claude-in-chrome` を検索し、
+      `enable__mcp__claude-in-chrome` があれば先に呼ぶ）。オーナーのパソコンの Chrome で開くので、
+      クラウドからは 403 で弾かれる **公式HP（tripla）と JTB もこちらなら確認できる**。
+      最初に `tabs_context_mcp` を呼び、新しいタブを開いて作業し、終わったら自分で開いたタブを閉じる。
+      サイトの許可を求められたらオーナーに許可を依頼して待つ。
+   2. Chrome が使えない（クラウド実行など）ときは Playwright + 事前インストール済みの Chromium
+      （`executablePath: '/opt/pw-browsers/chromium'`。`playwright install` は実行しない）。
+      この場合、公式HPと JTB は 403 になりやすいので ❓ として記録し、
+      「パソコンの Claude デスクトップアプリ（Chrome 接続）で再確認が必要」とレポートに書く。
    - 条件は **大人1名・1泊・1室**（sites.md に別条件があればそれも）。
    - 月表示の空室カレンダーがあるサイトはカレンダーで月ごとに確認する
      （○/△/×/残室数/「-」「販売なし」の区別を記録）。
