@@ -17,6 +17,6 @@ export type UsageSnapshot = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'usage-band': { snapshot: UsageSnapshot | null; isHidden: boolean }
+    'usage-band': { snapshot: UsageSnapshot | null }
   }
 }

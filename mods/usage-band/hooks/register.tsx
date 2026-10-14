@@ -7,7 +7,8 @@ import type { UsageSnapshot, UsageWindow } from '../types'
 const REFRESH_MS = 60_000
 
 const snapshot = atom({ plugin: 'usage-band', key: 'snapshot' } as const, null)
-const isHidden = atom({ plugin: 'usage-band', key: 'isHidden' } as const, false)
+const PANE = 'usage-band'
+const TITLE = 'Claude使用量'
 
 const ORDER = ['five_hour', 'seven_day']
 const LABELS: Record<string, string> = {
@@ -73,13 +74,14 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'usage-band',
-      description: 'Claude使用量（本日・今週）を表示する。`hide` で画面下のバンドを隠す',
+      description: 'Claude使用量（本日・今週）をパネルに表示する。`hide` でパネルを閉じる',
       argumentHint: '[show|hide]',
     })
     await refresh($)
     $.clock.every(REFRESH_MS, () => {
       void refresh($)
     })
+    void $.ui.open({ id: PANE, title: TITLE })
 
     return next(e)
   })
@@ -92,54 +94,42 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'usage-band' }, async ($, e) => {
-    const wantsHidden = e.args.trim() === 'hide'
-    await update($, isHidden, () => wantsHidden)
+    if (e.args.trim() === 'hide') {
+      await $.ui.close({ id: PANE })
+      return { text: 'パネルを閉じました。/usage-band で再表示します。' }
+    }
+    await $.ui.open({ id: PANE, title: TITLE })
     const snap = await read($, snapshot)
-    const note = wantsHidden
-      ? '\n（バンドを隠しました。/usage-band で再表示）'
-      : '\n（画面下のバンドに表示中。/usage-band hide で隠す）'
 
-    return { text: describe(snap) + note }
+    return { text: describe(snap) + '\n（パネルに表示中。/usage-band hide で閉じる）' }
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey || (await read($, isHidden))) {
-      return next(e)
-    }
-
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const snap = await read($, snapshot)
-    const { Box, Button, Text } = $.ui.resolve(e)
-    const hide = (
-      <Button key="hide" label="非表示" onPress={() => update($, isHidden, () => true)} />
-    )
+    const { Box, Text } = $.ui.resolve(e)
 
     if (snap === null || snap.windows.length === 0) {
       return (
-        <Box>
-          <Text dimColor wrap="truncate">{describe(snap)} </Text>
-          {hide}
+        <Box flexDirection="column">
+          <Text dimColor>{describe(snap)}</Text>
         </Box>
       )
     }
 
-    const columns = e.props.bodyColumns
-    const barWidth = Math.max(6, Math.min(20, Math.floor(columns / 5)))
+    const barWidth = Math.max(6, Math.min(20, e.props.bodyColumns - 22))
 
     return (
       <Box flexDirection="column">
-        <Box>
-          <Text bold>Claude使用量</Text>
-          <Text dimColor> </Text>
-          {hide}
-        </Box>
         {snap.windows.map(w => {
           const left = remaining(w.resetsAt, snap.at)
           return (
-            <Box key={w.kind}>
-              <Text wrap="truncate">{label(w.kind)} </Text>
-              <Text color={tone(w.percentUsed)}>{bar(w.percentUsed, barWidth)}</Text>
-              <Text bold> {w.percentUsed}%</Text>
-              {left && <Text dimColor wrap="truncate">  リセット{left}</Text>}
+            <Box key={w.kind} flexDirection="column">
+              <Text bold>{label(w.kind)}</Text>
+              <Box>
+                <Text color={tone(w.percentUsed)}>{bar(w.percentUsed, barWidth)}</Text>
+                <Text bold> {w.percentUsed}%</Text>
+              </Box>
+              {left && <Text dimColor>リセット{left}</Text>}
             </Box>
           )
         })}
