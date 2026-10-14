@@ -1,6 +1,6 @@
 {
   "name": "usage-band",
-  "version": "0.2.0",
-  "description": "Claudeの使用量（本日＝5時間枠・今週＝7日枠）をパネルに表示する",
+  "version": "0.3.0",
+  "description": "Claudeの使用量（本日＝5時間枠・今週＝7日枠）をパネルとステータス行に常時表示する",
   "types": "./types/index.d.ts"
 }

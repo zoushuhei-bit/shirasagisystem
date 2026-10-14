@@ -54,3 +54,24 @@ test('計測後は本日(5時間枠)・今週(7日枠)の順にパネルへ描�
     await ui.unmount()
   }
 })
+
+test('計測のたびにステータス行を更新し、パネルを開き直す', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  const statuses: (string | undefined)[] = []
+  const opens: string[] = []
+  on('session.measure', ($, e) => ({ changed: e.changed }))
+  on('ui.status', ($, e) => {
+    statuses.push(e.text)
+    return { value: undefined }
+  })
+  on('ui.open', ($, e) => {
+    opens.push(e.id)
+    return { value: { isPlaced: true } }
+  })
+
+  await measure($)
+  await measure($)
+
+  expect(statuses.at(-1)).toBe('Claude使用量 本日 42.5%（あと2時間13分） ｜ 今週 18%（あと5日3時間）')
+  expect(opens).toEqual(['usage-band', 'usage-band'])
+})

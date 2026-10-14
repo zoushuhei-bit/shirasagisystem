@@ -64,24 +64,45 @@ const describe = (snap: UsageSnapshot | null): string => {
     .join('\n')
 }
 
+/** プロンプト下のステータス行に出す1行の要約。 */
+const statusLine = (snap: UsageSnapshot): string => {
+  if (snap.windows.length === 0) return 'Claude使用量: 取得待ち'
+  return (
+    'Claude使用量 ' +
+    snap.windows
+      .map(w => {
+        const left = remaining(w.resetsAt, snap.at)
+        return `${label(w.kind).replace(/ \(.*\)$/, '')} ${w.percentUsed}%${left ? `（${left}）` : ''}`
+      })
+      .join(' ｜ ')
+  )
+}
+
+/**
+ * 数値を取り直し、ステータス行を更新し、パネルが閉じられていれば開き直す。
+ * 1分ごとと、エンジンが数値を送ってくるたびに呼ばれるので、表示が出続ける。
+ */
 async function refresh($: EngineInterface, limits?: readonly SessionRateLimit[]) {
   const rateLimits = limits ?? (await $.session.usage()).rateLimits
   const at = await $.clock.now()
-  await update($, snapshot, () => ({ windows: toWindows(rateLimits), at }))
+  const snap: UsageSnapshot = { windows: toWindows(rateLimits), at }
+  await update($, snapshot, () => snap)
+  $.ui.status(statusLine(snap))
+  await $.ui.open({ id: PANE, title: TITLE })
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'usage-band',
-      description: 'Claude使用量（本日・今週）をパネルに表示する。`hide` でパネルを閉じる',
-      argumentHint: '[show|hide]',
+      description: 'Claude使用量（本日・今週）を今すぐ取り直して表示する',
     })
+    $.ui.status('Claude使用量: 取得待ち')
+    void $.ui.open({ id: PANE, title: TITLE })
     await refresh($)
     $.clock.every(REFRESH_MS, () => {
       void refresh($)
     })
-    void $.ui.open({ id: PANE, title: TITLE })
 
     return next(e)
   })
@@ -93,15 +114,11 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('command.run', { command: 'usage-band' }, async ($, e) => {
-    if (e.args.trim() === 'hide') {
-      await $.ui.close({ id: PANE })
-      return { text: 'パネルを閉じました。/usage-band で再表示します。' }
-    }
-    await $.ui.open({ id: PANE, title: TITLE })
+  on('command.run', { command: 'usage-band' }, async $ => {
+    await refresh($)
     const snap = await read($, snapshot)
 
-    return { text: describe(snap) + '\n（パネルに表示中。/usage-band hide で閉じる）' }
+    return { text: describe(snap) }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
